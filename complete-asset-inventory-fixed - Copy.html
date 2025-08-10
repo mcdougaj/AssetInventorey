@@ -1,0 +1,3597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="theme-color" content="#1e3c72">
+    <title>Asset Inventory Management System</title>
+    
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- QR/Barcode Scanner -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- DOMPurify for XSS protection -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
+    <!-- JSZip for bulk photo download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --primary: #1e3c72;
+            --primary-dark: #152a52;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --light: #f9fafb;
+            --dark: #1f2937;
+            --border: #e5e7eb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh;
+            padding-bottom: 70px;
+        }
+
+        /* Login Screen */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .login-logo {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+
+        .login-title {
+            font-size: 24px;
+            color: var(--dark);
+            margin-bottom: 30px;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .role-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .role-btn {
+            padding: 15px;
+            border: 2px solid var(--border);
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .role-btn:hover {
+            border-color: var(--primary);
+            background: #f0f4ff;
+        }
+
+        .role-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            font-size: 13px;
+        }
+
+        .user-role {
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        /* View Toggle for Admin */
+        .view-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: white;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .view-btn {
+            padding: 10px 20px;
+            border: none;
+            background: var(--light);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .view-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: transform 0.2s;
+            min-height: 70px;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+        }
+
+        .stat-info {
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 22px;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-icon {
+            font-size: 28px;
+            opacity: 0.3;
+        }
+
+        /* Action Bar */
+        .action-bar {
+            background: white;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .search-container {
+            flex: 1;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            position: relative;
+            min-width: 150px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 9px 35px 9px 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .search-input:focus {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+            border-color: var(--primary);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6b7280;
+            pointer-events: none;
+            font-size: 16px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* Scan button */
+        .btn-scan {
+            padding: 9px 16px;
+            background: #6b7280;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .btn-scan:hover {
+            background: #4b5563;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        /* Filter Section */
+        .filter-section {
+            background: white;
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .filter-select {
+            padding: 10px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+            border-color: var(--primary);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 9px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn:not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        /* Table */
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .table-header {
+            padding: 15px 20px;
+            background: #f9fafb;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .table-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #f9fafb;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 15px;
+            background: #f9fafb;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 14px;
+        }
+
+        tbody tr:hover {
+            background: #f9fafb;
+        }
+
+        .asset-id-cell {
+            font-weight: 600;
+            color: var(--primary);
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .asset-id-cell:hover {
+            text-decoration: underline;
+            color: var(--primary-dark);
+        }
+
+        .checkbox-cell {
+            text-align: center;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: #f9fafb;
+            border-top: 1px solid var(--border);
+        }
+
+        .pagination-btn {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-info {
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-audited {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-pending {
+            background: #fed7aa;
+            color: #92400e;
+        }
+
+        .status-missing {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Admin Panel Sections */
+        .admin-section {
+            display: none;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .admin-section.active {
+            display: block;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Form */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            padding: 10px 12px;
+            border: 2px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+            border-color: var(--primary);
+        }
+
+        /* Location Assignment Section */
+        .location-assignment {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .location-assignment h4 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #374151;
+        }
+
+        .locations-list {
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .location-checkbox-item {
+            display: block;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+
+        .location-checkbox-item input {
+            margin-right: 8px;
+        }
+
+        /* Photo Management Styles */
+        .photo-section {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .photo-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: #f3f4f6;
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .photo-toggle-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .photo-toggle-btn.active {
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            color: #1e3c72;
+        }
+
+        .photo-count {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #3b82f6;
+            color: white;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .upload-zone {
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            background: #f9fafb;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .upload-zone:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .upload-zone.dragover {
+            border-color: #10b981;
+            background: #d1fae5;
+        }
+
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .photo-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #e5e7eb;
+            background: #f9fafb;
+        }
+
+        .photo-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+
+        .photo-item:hover img {
+            transform: scale(1.05);
+        }
+
+        .photo-actions {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            display: flex;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .photo-item:hover .photo-actions {
+            opacity: 1;
+        }
+
+        .photo-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .photo-btn:hover {
+            background: white;
+            transform: scale(1.1);
+        }
+
+        .photo-date {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            right: 5px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        .photo-viewer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .photo-viewer.active {
+            display: flex;
+        }
+
+        .viewer-content {
+            position: relative;
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+
+        .viewer-image {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 8px;
+        }
+
+        .viewer-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 24px;
+        }
+
+        .viewer-nav:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .viewer-nav.prev { left: -70px; }
+        .viewer-nav.next { right: -70px; }
+
+        .viewer-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .viewer-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .viewer-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .photo-empty {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+
+        .photo-thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+            cursor: pointer;
+            border: 2px solid var(--border);
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 15px;
+            background: none;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-item.admin-only {
+            display: none;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 350px;
+        }
+
+        .toast {
+            padding: 12px 20px;
+            background: #1f2937;
+            color: white;
+            border-radius: 8px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideInRight 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.warning { background: var(--warning); }
+        .toast.info { background: var(--info); }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Charts */
+        .chart-container {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+            margin-bottom: 20px;
+        }
+
+        /* Category List */
+        .category-list {
+            display: grid;
+            gap: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 10px;
+            background: var(--light);
+            border-radius: 10px;
+        }
+
+        .category-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        /* Import Zone */
+        .import-zone {
+            border: 3px dashed var(--border);
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: var(--light);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .import-zone:hover {
+            border-color: var(--primary);
+            background: #f0f4ff;
+        }
+
+        .import-zone.dragover {
+            border-color: var(--success);
+            background: #d1fae5;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding-bottom: 70px;
+            }
+
+            .header h1 {
+                font-size: 16px;
+            }
+
+            .container {
+                margin: 10px auto;
+                padding: 0 10px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+
+            .action-bar {
+                padding: 10px;
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .search-container {
+                width: 100%;
+            }
+
+            .action-buttons {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            .modal-content {
+                max-width: 100%;
+                margin: 0;
+                border-radius: 20px 20px 0 0;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .viewer-nav.prev { left: 20px; }
+            .viewer-nav.next { right: 20px; }
+        }
+
+        /* Hide/Show based on role */
+        .admin-only {
+            display: none;
+        }
+
+        body.admin-mode .admin-only {
+            display: block;
+        }
+
+        body.admin-mode .nav-item.admin-only {
+            display: flex;
+        }
+
+        /* Main content views */
+        .view-content {
+            display: none;
+        }
+
+        .view-content.active {
+            display: block;
+        }
+
+        /* Scanner */
+        #scanner-container {
+            width: 100%;
+            height: 400px;
+            background: black;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        /* Download All Button */
+        .download-all-btn {
+            margin-top: 15px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container" style="display: none;">
+        <div class="login-card">
+            <div class="login-logo">📦</div>
+            <h2 class="login-title">Asset Inventory System</h2>
+            
+            <form id="loginForm" class="login-form">
+                <div class="role-selector">
+                    <button type="button" class="role-btn active" data-role="user">
+                        👤 User Access
+                    </button>
+                    <button type="button" class="role-btn" data-role="admin">
+                        🛡️ Admin Access
+                    </button>
+                </div>
+                
+                <div class="form-group">
+                    <input type="email" class="form-input" id="loginEmail" placeholder="Email address" required>
+                </div>
+                
+                <div class="form-group">
+                    <input type="password" class="form-input" id="loginPassword" placeholder="Password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    Login
+                </button>
+                
+                <p style="margin-top: 20px; font-size: 12px; color: #6b7280;">
+                    Demo Mode: Use any email and password
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" style="display: block;">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>📦 Asset Inventory Management</h1>
+                <div class="header-right">
+                    <div class="user-info">
+                        <span>👤</span>
+                        <span id="currentUser">user@example.com</span>
+                        <span class="user-role" id="userRole">USER</span>
+                    </div>
+                    <div class="sync-status">
+                        <div class="status-dot"></div>
+                        <span>Connected</span>
+                    </div>
+                    <button class="btn btn-danger" onclick="App.logout()" style="padding: 8px 16px;">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Container -->
+        <div class="container">
+            <!-- View Toggle (Admin Only) -->
+            <div class="view-toggle admin-only">
+                <button class="view-btn active" onclick="App.switchView('inventory')">
+                    📦 Inventory
+                </button>
+                <button class="view-btn" onclick="App.switchView('categories')">
+                    🏷️ Categories
+                </button>
+                <button class="view-btn" onclick="App.switchView('users')">
+                    👥 Users
+                </button>
+                <button class="view-btn" onclick="App.switchView('import')">
+                    📤 Import/Export
+                </button>
+                <button class="view-btn" onclick="App.switchView('reports')">
+                    📊 Reports
+                </button>
+            </div>
+
+            <!-- Inventory View (Default for all users) -->
+            <div id="inventory-view" class="view-content active">
+                <!-- Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-value" id="totalAssets">0</div>
+                            <div class="stat-label">Total Assets</div>
+                        </div>
+                        <div class="stat-icon">📦</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-value" id="processedAssets">0</div>
+                            <div class="stat-label">Processed</div>
+                        </div>
+                        <div class="stat-icon">✅</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-value" id="reviewAssets">0</div>
+                            <div class="stat-label">Needs Review</div>
+                        </div>
+                        <div class="stat-icon">⚠️</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-value" id="todayAssets">0</div>
+                            <div class="stat-label">With Photos</div>
+                        </div>
+                        <div class="stat-icon">📸</div>
+                    </div>
+                </div>
+
+                <!-- Action Bar -->
+                <div class="action-bar">
+                    <div class="search-container">
+                        <div class="search-box">
+                            <input type="search" class="search-input" id="searchInput" placeholder="Search assets...">
+                            <span class="search-icon">🔍</span>
+                        </div>
+                        <button class="btn-scan" onclick="App.startScanner()">📷 Scan</button>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" onclick="App.openAddModal()">➕ Add</button>
+                        <button class="btn btn-secondary" onclick="App.exportData()">📥 Export</button>
+                        <button class="btn btn-warning admin-only" onclick="App.switchView('import')">📤 Import</button>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filter-section">
+                    <div class="filter-grid">
+                        <select class="filter-select" id="filterLocation" aria-label="Filter by location" onchange="App.applyFilters()">
+                            <option value="">All Locations</option>
+                        </select>
+                        <select class="filter-select" id="filterCategory" aria-label="Filter by category" onchange="App.applyFilters()">
+                            <option value="">All Categories</option>
+                            <option value="Equipment">Equipment</option>
+                            <option value="Furniture">Furniture</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Vehicles">Vehicles</option>
+                            <option value="Tools">Tools</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <select class="filter-select" id="filterStatus" aria-label="Filter by status" onchange="App.applyFilters()">
+                            <option value="">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="audited">Audited</option>
+                            <option value="missing">Missing</option>
+                        </select>
+                        <select class="filter-select" id="filterProcessed" aria-label="Filter by processed state" onchange="App.applyFilters()">
+                            <option value="">All Items</option>
+                            <option value="true">Processed</option>
+                            <option value="false">Not Processed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="table-container">
+                    <div class="table-header">
+                        <h2 class="table-title">Assets</h2>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <span id="recordCount" style="font-size: 13px; color: #6b7280;"></span>
+                            <select id="itemsPerPage" aria-label="Items per page" onchange="App.changePageSize()" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+                                <option value="25">25 per page</option>
+                                <option value="50">50 per page</option>
+                                <option value="100">100 per page</option>
+                                <option value="all">All records</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Photo</th>
+                                    <th>Asset ID</th>
+                                    <th>Name</th>
+                                    <th class="hide-mobile">Category</th>
+                                    <th class="hide-mobile">Manufacturer</th>
+                                    <th class="hide-mobile">Model</th>
+                                    <th class="hide-mobile">Serial #</th>
+                                    <th class="hide-mobile">Year</th>
+                                    <th class="hide-mobile">Location</th>
+                                    <th>Status</th>
+                                    <th class="hide-mobile">Processed</th>
+                                    <th class="hide-mobile">Review</th>
+                                    <th class="hide-mobile">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assetsTableBody">
+                                <tr>
+                                    <td colspan="13" style="text-align: center; padding: 40px;">
+                                        <div class="spinner"></div>
+                                        Loading...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="pagination" class="pagination"></div>
+                </div>
+            </div>
+
+            <!-- Categories View (Admin Only) -->
+            <div id="categories-view" class="view-content admin-only">
+                <div class="admin-section active">
+                    <div class="section-header">
+                        <h2 class="section-title">Manage Categories</h2>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                        <div>
+                            <h3>Add New Category</h3>
+                            <form id="categoryForm" style="margin-top: 20px;">
+                                <div class="form-group">
+                                    <label class="form-label">Category Name</label>
+                                    <input type="text" class="form-input" id="categoryName" placeholder="e.g., Heavy Machinery" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Description (Optional)</label>
+                                    <textarea class="form-textarea" id="categoryDescription" placeholder="Brief description of this category" rows="3"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Add Category</button>
+                            </form>
+                        </div>
+                        
+                        <div>
+                            <h3>Existing Categories</h3>
+                            <div class="category-list" id="categoriesList" style="margin-top: 20px;">
+                                <!-- Categories will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users View (Admin Only) -->
+            <div id="users-view" class="view-content admin-only">
+                <div class="admin-section active">
+                    <div class="section-header">
+                        <h2 class="section-title">User Management</h2>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                        <div>
+                            <h3 id="userFormTitle">Add New User</h3>
+                            <form id="userAddForm" style="margin-top: 20px;">
+                                <input type="hidden" id="userEditId" value="">
+                                <div class="form-group">
+                                    <label class="form-label">Full Name *</label>
+                                    <input type="text" class="form-input" id="userNameInput" placeholder="John Doe" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Email Address *</label>
+                                    <input type="email" class="form-input" id="userEmailInput" placeholder="user@company.com" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Password *</label>
+                                    <input type="password" class="form-input" id="userPasswordInput" placeholder="Enter password" required>
+                                    <small style="color: #6b7280; font-size: 11px;">Min 6 characters</small>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Role *</label>
+                                    <select class="form-select" id="userRoleSelect" required>
+                                        <option value="user">User (Add/Edit Assets)</option>
+                                        <option value="admin">Admin (Full Access)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Department</label>
+                                    <input type="text" class="form-input" id="userDepartmentInput" placeholder="e.g., Warehouse, IT, Operations">
+                                </div>
+                                
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                    <div class="form-group">
+                                        <label class="form-label">Start Date</label>
+                                        <input type="date" class="form-input" id="userStartDate">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">End Date (Optional)</label>
+                                        <input type="date" class="form-input" id="userEndDate" title="User access will expire after this date">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <input type="checkbox" id="userIsActive" checked style="margin-right: 8px;">
+                                        Active (User can log in)
+                                    </label>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label">Notes</label>
+                                    <textarea class="form-input" id="userNotes" placeholder="Any additional notes about this user" rows="2"></textarea>
+                                </div>
+                                
+                                <!-- Location Assignment Section -->
+                                <div class="location-assignment">
+                                    <h4>📍 Assign Locations</h4>
+                                    <div style="margin-bottom: 10px;">
+                                        <label class="location-checkbox-item">
+                                            <input type="checkbox" id="allLocationsCheckbox" onchange="App.toggleAllLocations()">
+                                            <strong>All Locations (Full Access)</strong>
+                                        </label>
+                                    </div>
+                                    <div class="locations-list" id="specificLocations">
+                                        <!-- Location checkboxes will be populated here -->
+                                    </div>
+                                </div>
+                                
+                                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                    <button type="submit" class="btn btn-primary" id="userSubmitBtn">Add User</button>
+                                    <button type="button" class="btn btn-secondary" onclick="App.cancelUserEdit()" id="userCancelBtn" style="display: none;">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3>Active Users</h3>
+                                <div style="display: flex; gap: 10px;">
+                                    <button class="btn btn-sm btn-secondary" onclick="App.refreshUsers()">🔄 Refresh</button>
+                                    <select id="userFilterSelect" onchange="App.filterUsers()" style="padding: 6px; border-radius: 6px; border: 1px solid var(--border);">
+                                        <option value="all">All Users</option>
+                                        <option value="active">Active Only</option>
+                                        <option value="inactive">Inactive Only</option>
+                                        <option value="expired">Expired</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="category-list" id="usersList" style="margin-top: 20px;">
+                                <!-- Users will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 40px; padding: 20px; background: #f9fafb; border-radius: 10px;">
+                        <h4 style="margin-bottom: 15px;">Role Permissions</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div>
+                                <strong style="color: #3b82f6;">👤 User</strong>
+                                <ul style="margin-top: 8px; font-size: 13px; color: #6b7280; list-style: none; padding-left: 0;">
+                                    <li>✓ View assigned location assets</li>
+                                    <li>✓ Add new assets</li>
+                                    <li>✓ Edit assets (status, notes, etc.)</li>
+                                    <li>✓ Upload/manage photos</li>
+                                    <li>✓ Search and filter</li>
+                                    <li>✓ Export data</li>
+                                    <li>✗ Delete assets</li>
+                                    <li>✗ Manage categories</li>
+                                    <li>✗ Manage users</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <strong style="color: #10b981;">🛡️ Admin</strong>
+                                <ul style="margin-top: 8px; font-size: 13px; color: #6b7280; list-style: none; padding-left: 0;">
+                                    <li>✓ All User permissions</li>
+                                    <li>✓ View all locations</li>
+                                    <li>✓ Delete assets</li>
+                                    <li>✓ Manage categories</li>
+                                    <li>✓ Manage users</li>
+                                    <li>✓ View analytics/reports</li>
+                                    <li>✓ Import bulk data</li>
+                                    <li>✓ System configuration</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="import-view" class="view-content admin-only">
+                <div class="admin-section active">
+                    <div class="section-header">
+                        <h2 class="section-title">Import & Export Data</h2>
+                    </div>
+                    <div class="import-zone" id="importZone">
+                        <div style="font-size: 48px;">📁</div>
+                        <h4>Drop CSV file here or click to browse</h4>
+                        <input type="file" id="importFile" accept=".csv" style="display: none;">
+                    </div>
+                </div>
+            </div>
+
+            <div id="reports-view" class="view-content admin-only">
+                <div class="chart-container">
+                    <h3>Asset Distribution by Category</h3>
+                    <canvas id="categoryChart" width="400" height="200"></canvas>
+                </div>
+                
+                <div class="chart-container">
+                    <h3>Asset Status Overview</h3>
+                    <canvas id="statusChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" onclick="App.switchView('inventory')">
+                <span class="nav-icon">📦</span>
+                <span class="nav-label">Assets</span>
+            </button>
+            <button class="nav-item" onclick="App.openAddModal()">
+                <span class="nav-icon">➕</span>
+                <span class="nav-label">Add</span>
+            </button>
+            <button class="nav-item" onclick="App.startScanner()">
+                <span class="nav-icon">📷</span>
+                <span class="nav-label">Scan</span>
+            </button>
+            <button class="nav-item admin-only" onclick="App.switchView('reports')">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Reports</span>
+            </button>
+            <button class="nav-item admin-only" onclick="App.switchView('users')">
+                <span class="nav-icon">👥</span>
+                <span class="nav-label">Users</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="assetModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New Asset</h2>
+                <button onclick="App.closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="assetForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Asset ID *</label>
+                            <input type="text" class="form-input" id="assetId" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-input" id="assetName">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Category</label>
+                            <select class="form-select" id="assetCategory">
+                                <option value="">Select Category</option>
+                                <option value="Equipment">Equipment</option>
+                                <option value="Furniture">Furniture</option>
+                                <option value="Electronics">Electronics</option>
+                                <option value="Vehicles">Vehicles</option>
+                                <option value="Tools">Tools</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Manufacturer</label>
+                            <input type="text" class="form-input" id="assetManufacturer">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Model</label>
+                            <input type="text" class="form-input" id="assetModel">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Serial Number</label>
+                            <input type="text" class="form-input" id="assetSerial">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Year</label>
+                            <input type="number" class="form-input" id="assetYear" min="1900" max="2099">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Location</label>
+                            <input type="text" class="form-input" id="assetLocation">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" id="assetStatus">
+                                <option value="pending">Pending</option>
+                                <option value="audited">Audited</option>
+                                <option value="missing">Missing</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <input type="checkbox" id="assetProcessed" style="margin-right: 8px;">
+                                Processed
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <input type="checkbox" id="assetNeedsReview" style="margin-right: 8px;">
+                                Needs Review
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-input" id="assetNotes" rows="3" style="resize: vertical;"></textarea>
+                    </div>
+                </form>
+
+                <!-- Photo Management Section -->
+                <div class="photo-section">
+                    <h3 style="margin-bottom: 15px;">📸 Asset Photos</h3>
+                    
+                    <!-- Photo Type Toggle -->
+                    <div class="photo-toggle">
+                        <button class="photo-toggle-btn active" onclick="App.PhotoManager.switchPhotoType('main')">
+                            <span>🏞️</span>
+                            <span>Asset Photos</span>
+                            <span class="photo-count" id="mainPhotoCount">0</span>
+                        </button>
+                        <button class="photo-toggle-btn" onclick="App.PhotoManager.switchPhotoType('nameplate')">
+                            <span>🏷️</span>
+                            <span>Nameplate Photos</span>
+                            <span class="photo-count" id="nameplatePhotoCount">0</span>
+                        </button>
+                    </div>
+
+                    <!-- Upload Zone -->
+                    <div id="mainPhotoUpload" class="upload-zone">
+                        <input type="file" id="mainPhotoInput" multiple accept="image/*" capture="environment" style="display: none;">
+                        <div>
+                            <div style="font-size: 48px; opacity: 0.5;">📷</div>
+                            <div><strong>Click or drag photos here</strong></div>
+                            <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">Supports JPG, PNG, HEIC</div>
+                        </div>
+                    </div>
+
+                    <div id="nameplatePhotoUpload" class="upload-zone" style="display: none;">
+                        <input type="file" id="nameplatePhotoInput" multiple accept="image/*" capture="environment" style="display: none;">
+                        <div>
+                            <div style="font-size: 48px; opacity: 0.5;">🏷️</div>
+                            <div><strong>Click or drag nameplate photos here</strong></div>
+                            <div style="font-size: 12px; color: #6b7280; margin-top: 5px;">Supports JPG, PNG, HEIC</div>
+                        </div>
+                    </div>
+
+                    <!-- Photo Grid -->
+                    <div id="photoGrid" class="photo-grid"></div>
+
+                    <!-- Empty State -->
+                    <div id="photoEmpty" class="photo-empty" style="display: none;">
+                        <div style="font-size: 64px; opacity: 0.3;">📸</div>
+                        <p>No photos uploaded yet</p>
+                    </div>
+
+                    <!-- Download All Button -->
+                    <button class="btn btn-success download-all-btn" onclick="App.PhotoManager.downloadAll()" id="downloadAllBtn" style="display: none;">
+                        ⬇ Download All Photos
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="App.closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="App.saveAsset()">Save Asset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanner Modal -->
+    <div id="scannerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Scan Asset Code</h2>
+                <button onclick="App.stopScanner()" style="background: none; border: none; font-size: 24px; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="scanner-container"></div>
+                <p style="text-align: center; margin-top: 10px;">Position barcode or QR code in view</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Viewer Modal -->
+    <div id="photoViewer" class="photo-viewer">
+        <div class="viewer-content">
+            <button class="viewer-nav prev" onclick="App.PhotoManager.navigatePhoto(-1)">‹</button>
+            <img id="viewerImage" class="viewer-image" src="" alt="Asset Photo">
+            <button class="viewer-nav next" onclick="App.PhotoManager.navigatePhoto(1)">›</button>
+            
+            <div class="viewer-controls">
+                <button class="viewer-btn" onclick="App.PhotoManager.downloadCurrent()" title="Download">⬇</button>
+                <button class="viewer-btn" onclick="App.PhotoManager.toggleFullscreen()" title="Fullscreen">⛶</button>
+                <button class="viewer-btn" onclick="App.PhotoManager.closeViewer()" title="Close">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+
+    <script>
+        // Main Application Module
+        const App = (function() {
+            'use strict';
+            
+            // Supabase credentials
+            const SUPABASE_URL = 'https://hlpwqslzqvruzmidzhim.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhscHdxc2x6cXZydXptaWR6aGltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ3NzU1OTksImV4cCI6MjA3MDM1MTU5OX0.ON6f30BiPfV9cjOQrUQIsdeJ8w_K0YrJpowxjzcXyRk';
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            
+            // State
+            let currentUser = null;
+            let currentUserData = null;
+            let userRole = 'user';
+            let assets = [];
+            let filteredAssets = [];
+            let currentAsset = null;
+            let locations = [];
+            let categories = [];
+            let users = [];
+            let currentScanner = null;
+            let currentPage = 1;
+            let itemsPerPage = 25;
+            let totalPages = 1;
+            
+            // Photo Manager Module
+            const PhotoManager = {
+                mainPhotos: [],
+                nameplatePhotos: [],
+                currentPhotoType: 'main',
+                currentViewerIndex: 0,
+                currentViewerType: 'main',
+                currentAssetId: null,
+                
+                init: function(assetId) {
+                    this.currentAssetId = assetId || currentAsset?.id;
+                    this.setupUploadZones();
+                    if (this.currentAssetId) {
+                        this.loadExistingPhotos();
+                    } else {
+                        this.mainPhotos = [];
+                        this.nameplatePhotos = [];
+                        this.displayPhotos();
+                        this.updatePhotoCounts();
+                    }
+                },
+                
+                setupUploadZones: function() {
+                    const mainZone = document.getElementById('mainPhotoUpload');
+                    const nameplateZone = document.getElementById('nameplatePhotoUpload');
+                    const mainInput = document.getElementById('mainPhotoInput');
+                    const nameplateInput = document.getElementById('nameplatePhotoInput');
+                    
+                    if (mainZone) {
+                        mainZone.onclick = (e) => {
+                            if (e.target.tagName !== 'INPUT') {
+                                mainInput.click();
+                            }
+                        };
+                        
+                        mainZone.ondragover = (e) => {
+                            e.preventDefault();
+                            mainZone.classList.add('dragover');
+                        };
+                        
+                        mainZone.ondragleave = () => {
+                            mainZone.classList.remove('dragover');
+                        };
+                        
+                        mainZone.ondrop = (e) => {
+                            e.preventDefault();
+                            mainZone.classList.remove('dragover');
+                            this.handleFiles(Array.from(e.dataTransfer.files), 'main');
+                        };
+                        
+                        mainInput.onchange = (e) => {
+                            this.handleFiles(Array.from(e.target.files), 'main');
+                        };
+                    }
+                    
+                    if (nameplateZone) {
+                        nameplateZone.onclick = (e) => {
+                            if (e.target.tagName !== 'INPUT') {
+                                nameplateInput.click();
+                            }
+                        };
+                        
+                        nameplateZone.ondragover = (e) => {
+                            e.preventDefault();
+                            nameplateZone.classList.add('dragover');
+                        };
+                        
+                        nameplateZone.ondragleave = () => {
+                            nameplateZone.classList.remove('dragover');
+                        };
+                        
+                        nameplateZone.ondrop = (e) => {
+                            e.preventDefault();
+                            nameplateZone.classList.remove('dragover');
+                            this.handleFiles(Array.from(e.dataTransfer.files), 'nameplate');
+                        };
+                        
+                        nameplateInput.onchange = (e) => {
+                            this.handleFiles(Array.from(e.target.files), 'nameplate');
+                        };
+                    }
+                },
+                
+                switchPhotoType: function(type) {
+                    this.currentPhotoType = type;
+                    
+                    document.querySelectorAll('.photo-toggle-btn').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    event.target.closest('.photo-toggle-btn').classList.add('active');
+                    
+                    document.getElementById('mainPhotoUpload').style.display = type === 'main' ? 'block' : 'none';
+                    document.getElementById('nameplatePhotoUpload').style.display = type === 'nameplate' ? 'block' : 'none';
+                    
+                    this.displayPhotos();
+                },
+                
+                handleFiles: async function(files, type) {
+                    if (!this.currentAssetId && !currentAsset) {
+                        showToast('Please save the asset first', 'warning');
+                        return;
+                    }
+                    
+                    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+                    if (imageFiles.length === 0) {
+                        showToast('Please select image files only', 'warning');
+                        return;
+                    }
+                    
+                    showLoading(true);
+                    
+                    try {
+                        for (const file of imageFiles) {
+                            const photo = await this.uploadPhoto(file, type);
+                            if (photo) {
+                                if (type === 'main') {
+                                    this.mainPhotos.push(photo);
+                                } else {
+                                    this.nameplatePhotos.push(photo);
+                                }
+                            }
+                        }
+                        
+                        await this.updateAssetPhotos();
+                        this.displayPhotos();
+                        this.updatePhotoCounts();
+                        showToast(`${imageFiles.length} photos uploaded`, 'success');
+                        
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        showToast('Failed to upload photos', 'error');
+                    } finally {
+                        showLoading(false);
+                    }
+                },
+                
+                uploadPhoto: async function(file, type) {
+                    try {
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                        const assetId = this.currentAssetId || currentAsset?.id || currentAsset?.asset_id;
+                        const fileName = `${assetId}/${type}/${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+                        
+                        const { data, error } = await supabase.storage
+                            .from('asset-photos')
+                            .upload(fileName, file, {
+                                contentType: file.type,
+                                upsert: false
+                            });
+                        
+                        if (error) throw error;
+                        
+                        const { data: { publicUrl } } = supabase.storage
+                            .from('asset-photos')
+                            .getPublicUrl(fileName);
+                        
+                        return {
+                            url: publicUrl,
+                            fileName: fileName,
+                            originalName: file.name,
+                            uploadDate: new Date().toISOString(),
+                            size: file.size,
+                            type: type
+                        };
+                        
+                    } catch (error) {
+                        console.error('Upload error:', error);
+                        return null;
+                    }
+                },
+                
+                loadExistingPhotos: async function() {
+                    if (!this.currentAssetId) return;
+                    
+                    try {
+                        const { data, error } = await supabase
+                            .from('assets')
+                            .select('main_photos, nameplate_photos')
+                            .eq('id', this.currentAssetId)
+                            .single();
+                        
+                        if (data) {
+                            this.mainPhotos = data.main_photos || [];
+                            this.nameplatePhotos = data.nameplate_photos || [];
+                            this.displayPhotos();
+                            this.updatePhotoCounts();
+                        }
+                    } catch (error) {
+                        console.error('Load photos error:', error);
+                    }
+                },
+                
+                updateAssetPhotos: async function() {
+                    const assetId = this.currentAssetId || currentAsset?.id;
+                    if (!assetId) return;
+                    
+                    try {
+                        const { error } = await supabase
+                            .from('assets')
+                            .update({
+                                main_photos: this.mainPhotos,
+                                nameplate_photos: this.nameplatePhotos
+                            })
+                            .eq('id', assetId);
+                        
+                        if (error) throw error;
+                        
+                    } catch (error) {
+                        console.error('Update photos error:', error);
+                        throw error;
+                    }
+                },
+                
+                displayPhotos: function() {
+                    const grid = document.getElementById('photoGrid');
+                    const photos = this.currentPhotoType === 'main' ? this.mainPhotos : this.nameplatePhotos;
+                    
+                    if (!grid) return;
+                    
+                    if (photos.length === 0) {
+                        grid.innerHTML = '';
+                        document.getElementById('photoEmpty').style.display = 'block';
+                        document.getElementById('downloadAllBtn').style.display = 'none';
+                        return;
+                    }
+                    
+                    document.getElementById('photoEmpty').style.display = 'none';
+                    document.getElementById('downloadAllBtn').style.display = 'block';
+                    
+                    grid.innerHTML = photos.map((photo, index) => `
+                        <div class="photo-item">
+                            <img src="${photo.url}" alt="${photo.originalName}" 
+                                 onclick="App.PhotoManager.openViewer(${index}, '${this.currentPhotoType}')">
+                            <div class="photo-actions">
+                                <button class="photo-btn" onclick="App.PhotoManager.downloadPhoto('${photo.url}', '${photo.originalName}')" title="Download">
+                                    ⬇
+                                </button>
+                                <button class="photo-btn" onclick="App.PhotoManager.deletePhoto(${index}, '${this.currentPhotoType}')" title="Delete">
+                                    🗑
+                                </button>
+                            </div>
+                            <div class="photo-date">${new Date(photo.uploadDate).toLocaleDateString()}</div>
+                        </div>
+                    `).join('');
+                },
+                
+                updatePhotoCounts: function() {
+                    const mainCount = document.getElementById('mainPhotoCount');
+                    const nameplateCount = document.getElementById('nameplatePhotoCount');
+                    
+                    if (mainCount) mainCount.textContent = this.mainPhotos.length;
+                    if (nameplateCount) nameplateCount.textContent = this.nameplatePhotos.length;
+                },
+                
+                openViewer: function(index, type) {
+                    const photos = type === 'main' ? this.mainPhotos : this.nameplatePhotos;
+                    if (!photos[index]) return;
+                    
+                    this.currentViewerIndex = index;
+                    this.currentViewerType = type;
+                    
+                    document.getElementById('viewerImage').src = photos[index].url;
+                    document.getElementById('photoViewer').classList.add('active');
+                },
+                
+                closeViewer: function() {
+                    document.getElementById('photoViewer').classList.remove('active');
+                },
+                
+                navigatePhoto: function(direction) {
+                    const photos = this.currentViewerType === 'main' ? this.mainPhotos : this.nameplatePhotos;
+                    this.currentViewerIndex = (this.currentViewerIndex + direction + photos.length) % photos.length;
+                    document.getElementById('viewerImage').src = photos[this.currentViewerIndex].url;
+                },
+                
+                downloadCurrent: function() {
+                    const photos = this.currentViewerType === 'main' ? this.mainPhotos : this.nameplatePhotos;
+                    const photo = photos[this.currentViewerIndex];
+                    if (photo) {
+                        this.downloadPhoto(photo.url, photo.originalName);
+                    }
+                },
+                
+                downloadPhoto: async function(url, originalName) {
+                    try {
+                        const response = await fetch(url);
+                        const blob = await response.blob();
+                        const assetId = this.currentAssetId || currentAsset?.asset_id || 'asset';
+                        const timestamp = new Date().toISOString().slice(0, 10);
+                        const fileName = `${assetId}_${timestamp}_${originalName}`;
+                        
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = fileName;
+                        a.click();
+                        
+                        showToast('Photo downloaded', 'success');
+                    } catch (error) {
+                        console.error('Download error:', error);
+                        showToast('Failed to download photo', 'error');
+                    }
+                },
+                
+                deletePhoto: async function(index, type) {
+                    if (!confirm('Delete this photo?')) return;
+                    
+                    try {
+                        const photos = type === 'main' ? this.mainPhotos : this.nameplatePhotos;
+                        const photo = photos[index];
+                        
+                        const { error } = await supabase.storage
+                            .from('asset-photos')
+                            .remove([photo.fileName]);
+                        
+                        if (error) throw error;
+                        
+                        if (type === 'main') {
+                            this.mainPhotos.splice(index, 1);
+                        } else {
+                            this.nameplatePhotos.splice(index, 1);
+                        }
+                        
+                        await this.updateAssetPhotos();
+                        this.displayPhotos();
+                        this.updatePhotoCounts();
+                        
+                        showToast('Photo deleted', 'success');
+                        
+                    } catch (error) {
+                        console.error('Delete error:', error);
+                        showToast('Failed to delete photo', 'error');
+                    }
+                },
+                
+                toggleFullscreen: function() {
+                    const viewer = document.getElementById('photoViewer');
+                    if (!document.fullscreenElement) {
+                        viewer.requestFullscreen().catch(err => {
+                            console.error('Fullscreen error:', err);
+                        });
+                    } else {
+                        document.exitFullscreen();
+                    }
+                },
+                
+                downloadAll: async function() {
+                    const allPhotos = [...this.mainPhotos, ...this.nameplatePhotos];
+                    if (allPhotos.length === 0) {
+                        showToast('No photos to download', 'warning');
+                        return;
+                    }
+                    
+                    if (window.JSZip) {
+                        try {
+                            showToast('Preparing ZIP download...', 'info');
+                            const zip = new JSZip();
+                            const mainFolder = zip.folder('asset_photos');
+                            const nameplateFolder = zip.folder('nameplate_photos');
+                            
+                            for (const photo of this.mainPhotos) {
+                                const response = await fetch(photo.url);
+                                const blob = await response.blob();
+                                mainFolder.file(photo.originalName, blob);
+                            }
+                            
+                            for (const photo of this.nameplatePhotos) {
+                                const response = await fetch(photo.url);
+                                const blob = await response.blob();
+                                nameplateFolder.file(photo.originalName, blob);
+                            }
+                            
+                            const zipBlob = await zip.generateAsync({ type: 'blob' });
+                            
+                            const a = document.createElement('a');
+                            const assetId = this.currentAssetId || currentAsset?.asset_id || 'asset';
+                            a.href = URL.createObjectURL(zipBlob);
+                            a.download = `${assetId}_photos_${new Date().toISOString().slice(0, 10)}.zip`;
+                            a.click();
+                            
+                            showToast('All photos downloaded as ZIP', 'success');
+                        } catch (error) {
+                            console.error('ZIP error:', error);
+                            showToast('Failed to create ZIP', 'error');
+                        }
+                    } else {
+                        showToast('Downloading photos individually...', 'info');
+                        for (const photo of allPhotos) {
+                            await this.downloadPhoto(photo.url, photo.originalName);
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        }
+                    }
+                }
+            };
+            
+            // Initialize
+            function init() {
+                checkAuth();
+                setupEventListeners();
+            }
+            
+            // Check authentication
+            function checkAuth() {
+                const storedUser = localStorage.getItem('currentUser');
+                const storedRole = localStorage.getItem('userRole');
+                const storedUserData = localStorage.getItem('currentUserData');
+                
+                if (storedUser) {
+                    currentUser = storedUser;
+                    userRole = storedRole || 'user';
+                    currentUserData = storedUserData ? JSON.parse(storedUserData) : {
+                        email: storedUser,
+                        role: storedRole,
+                        assignedLocations: ['all']
+                    };
+                    showMainApp();
+                } else {
+                    showLoginScreen();
+                }
+            }
+            
+            // Show login screen
+            function showLoginScreen() {
+                document.getElementById('loginScreen').style.display = 'flex';
+                document.getElementById('mainApp').style.display = 'none';
+            }
+            
+            // Show main app
+            function showMainApp() {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('mainApp').style.display = 'block';
+                
+                document.getElementById('currentUser').textContent = currentUser;
+                document.getElementById('userRole').textContent = userRole.toUpperCase();
+                
+                // Show location restrictions in header
+                if (userRole !== 'admin') {
+                    if (currentUserData?.assignedLocations && currentUserData.assignedLocations.length > 0) {
+                        if (!currentUserData.assignedLocations.includes('all')) {
+                            const locationCount = currentUserData.assignedLocations.length;
+                            const roleElement = document.getElementById('userRole');
+                            if (roleElement) {
+                                roleElement.textContent = `${userRole.toUpperCase()} • ${locationCount} Location${locationCount > 1 ? 's' : ''}`;
+                            }
+                        }
+                    } else {
+                        // User has no locations assigned
+                        const roleElement = document.getElementById('userRole');
+                        if (roleElement) {
+                            roleElement.textContent = `${userRole.toUpperCase()} • NO ACCESS`;
+                            roleElement.style.background = '#ef4444';
+                        }
+                        showToast('Warning: No locations assigned. Contact admin for access.', 'warning');
+                    }
+                }
+                
+                if (userRole === 'admin') {
+                    document.body.classList.add('admin-mode');
+                } else {
+                    document.body.classList.remove('admin-mode');
+                }
+                
+                loadAssets();
+                if (userRole === 'admin') {
+                    initCharts();
+                }
+            }
+            
+            // Setup event listeners
+            function setupEventListeners() {
+                document.getElementById('loginForm')?.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    handleLogin();
+                });
+                
+                document.querySelectorAll('.role-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                    });
+                });
+                
+                document.getElementById('searchInput')?.addEventListener('input', debounce(applyFilters, 300));
+                
+                document.getElementById('categoryForm')?.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    addCategory();
+                });
+                
+                document.getElementById('userAddForm')?.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    addUser();
+                });
+                
+                const importZone = document.getElementById('importZone');
+                const importFile = document.getElementById('importFile');
+                
+                if (importZone && importFile) {
+                    importZone.addEventListener('click', () => importFile.click());
+                    importFile.addEventListener('change', (e) => {
+                        handleFileImport(e.target.files[0]);
+                    });
+                }
+            }
+            
+            // Handle login
+            async function handleLogin() {
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+                const role = document.querySelector('.role-btn.active').dataset.role;
+                
+                if (!email || !password) {
+                    showToast('Please enter email and password', 'warning');
+                    return;
+                }
+                
+                currentUser = email;
+                userRole = role;
+                
+                try {
+                    // Try to find user in database and verify password
+                    const { data, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('email', email)
+                        .eq('password', password) // Simple password check
+                        .single();
+                    
+                    if (data) {
+                        // Check if user is active
+                        if (!data.is_active) {
+                            showToast('Your account is inactive. Contact admin.', 'error');
+                            return;
+                        }
+                        
+                        // Check if user has expired (only if end_date is not NULL)
+                        const today = new Date().toISOString().split('T')[0];
+                        if (data.end_date && data.end_date < today) {
+                            showToast('Your account has expired. Contact admin.', 'error');
+                            return;
+                        }
+                        
+                        currentUserData = {
+                            id: data.id,
+                            email: data.email,
+                            name: data.name,
+                            role: data.role,
+                            assignedLocations: data.assigned_locations || [],
+                            department: data.department
+                        };
+                        userRole = data.role; // Use role from database
+                        
+                        localStorage.setItem('currentUser', currentUser);
+                        localStorage.setItem('userRole', userRole);
+                        localStorage.setItem('currentUserData', JSON.stringify(currentUserData));
+                        
+                        showMainApp();
+                        showToast(`Welcome ${currentUserData.name || currentUser}!`, 'success');
+                    } else {
+                        showToast('Invalid email or password', 'error');
+                    }
+                } catch (error) {
+                    // User not found or wrong password
+                    showToast('Invalid email or password', 'error');
+                }
+            }
+            
+            // Logout
+            function logout() {
+                localStorage.removeItem('currentUser');
+                localStorage.removeItem('userRole');
+                localStorage.removeItem('currentUserData');
+                currentUser = null;
+                userRole = 'user';
+                showLoginScreen();
+            }
+            
+            // Switch view
+            function switchView(view) {
+                const adminOnlyViews = ['categories', 'users', 'import', 'reports'];
+                if (adminOnlyViews.includes(view) && userRole !== 'admin') {
+                    showToast('Access denied. Admin only.', 'warning');
+                    return;
+                }
+                
+                document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+                event.target?.classList.add('active');
+                
+                document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                
+                document.querySelectorAll('.view-content').forEach(v => {
+                    v.classList.remove('active');
+                    v.style.display = 'none';
+                });
+                
+                const selectedView = document.getElementById(`${view}-view`);
+                if (selectedView) {
+                    selectedView.classList.add('active');
+                    selectedView.style.display = 'block';
+                }
+                
+                if (view === 'categories') loadCategories();
+                if (view === 'users') {
+                    loadUsers();
+                    setTimeout(() => updateLocationCheckboxes(), 100);
+                }
+                if (view === 'reports') updateCharts();
+            }
+            
+            // Load categories
+            function loadCategories() {
+                const uniqueCategories = [...new Set(assets.map(a => a.category).filter(Boolean))];
+                categories = uniqueCategories.sort();
+                
+                const defaultCategories = ['Equipment', 'Furniture', 'Electronics', 'Vehicles', 'Tools', 'Other'];
+                defaultCategories.forEach(cat => {
+                    if (!categories.includes(cat)) {
+                        categories.push(cat);
+                    }
+                });
+                
+                displayCategories();
+            }
+            
+            // Display categories
+            function displayCategories() {
+                const list = document.getElementById('categoriesList');
+                if (!list) return;
+                
+                if (categories.length === 0) {
+                    list.innerHTML = '<p style="text-align: center; color: #9ca3af;">No categories yet. Add your first category above.</p>';
+                    return;
+                }
+                
+                list.innerHTML = categories.sort().map(cat => `
+                    <div class="category-item">
+                        <div>
+                            <strong>${DOMPurify.sanitize(cat)}</strong>
+                            <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                                ${assets.filter(a => a.category === cat).length} assets
+                            </div>
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="App.deleteCategory('${cat}')" 
+                                ${assets.some(a => a.category === cat) ? 'disabled title="Cannot delete - category in use"' : ''}>
+                            Delete
+                        </button>
+                    </div>
+                `).join('');
+            }
+            
+            // Add category
+            function addCategory() {
+                const name = document.getElementById('categoryName')?.value.trim();
+                const description = document.getElementById('categoryDescription')?.value.trim();
+                
+                if (!name) {
+                    showToast('Please enter a category name', 'warning');
+                    return;
+                }
+                
+                if (categories.includes(name)) {
+                    showToast('Category already exists', 'warning');
+                    return;
+                }
+                
+                categories.push(name);
+                displayCategories();
+                updateCategoryDropdowns();
+                
+                document.getElementById('categoryForm').reset();
+                showToast(`Category "${name}" added successfully`, 'success');
+            }
+            
+            // Delete category
+            function deleteCategory(name) {
+                const inUse = assets.some(a => a.category === name);
+                if (inUse) {
+                    showToast('Cannot delete category that is in use', 'warning');
+                    return;
+                }
+                
+                if (!confirm(`Delete category "${name}"?`)) return;
+                
+                categories = categories.filter(c => c !== name);
+                displayCategories();
+                updateCategoryDropdowns();
+                showToast('Category deleted', 'success');
+            }
+            
+            // Update category dropdowns
+            function updateCategoryDropdowns() {
+                const categorySelects = [
+                    document.getElementById('assetCategory'),
+                    document.getElementById('filterCategory')
+                ];
+                
+                categorySelects.forEach(select => {
+                    if (!select) return;
+                    
+                    const currentValue = select.value;
+                    const isFilter = select.id === 'filterCategory';
+                    
+                    if (isFilter) {
+                        select.innerHTML = '<option value="">All Categories</option>' +
+                            categories.sort().map(cat => 
+                                `<option value="${cat}">${DOMPurify.sanitize(cat)}</option>`
+                            ).join('');
+                    } else {
+                        select.innerHTML = '<option value="">Select Category</option>' +
+                            categories.sort().map(cat => 
+                                `<option value="${cat}">${DOMPurify.sanitize(cat)}</option>`
+                            ).join('');
+                    }
+                    
+                    if (currentValue && categories.includes(currentValue)) {
+                        select.value = currentValue;
+                    }
+                });
+            }
+            
+            // Load users
+            async function loadUsers() {
+                try {
+                    // Load users from Supabase
+                    const { data, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+                    
+                    if (error) throw error;
+                    
+                    users = data || [];
+                    
+                    // Check for expired users and update their status
+                    const today = new Date().toISOString().split('T')[0];
+                    for (const user of users) {
+                        // Only check expiration if end_date is not NULL
+                        if (user.end_date && user.end_date < today && user.is_active) {
+                            // Mark user as inactive if end date has passed
+                            await supabase
+                                .from('users')
+                                .update({ is_active: false })
+                                .eq('id', user.id);
+                            user.is_active = false;
+                        }
+                    }
+                    
+                    displayUsers();
+                    updateLocationCheckboxes();
+                } catch (error) {
+                    console.error('Error loading users:', error);
+                    showToast('Failed to load users', 'error');
+                }
+            }
+            
+            // Display users
+            function displayUsers() {
+                const list = document.getElementById('usersList');
+                if (!list) return;
+                
+                if (users.length === 0) {
+                    list.innerHTML = '<p style="text-align: center; color: #9ca3af;">No users yet. Add your first user above.</p>';
+                    return;
+                }
+                
+                const roleOrder = { admin: 0, user: 1 };
+                const sortedUsers = [...users].sort((a, b) => 
+                    roleOrder[a.role] - roleOrder[b.role] || a.name.localeCompare(b.name)
+                );
+                
+                list.innerHTML = sortedUsers.map(user => {
+                    const roleColors = {
+                        admin: '#10b981',
+                        user: '#3b82f6'
+                    };
+                    
+                    const roleIcons = {
+                        admin: '🛡️',
+                        user: '👤'
+                    };
+                    
+                    const assignedLocations = user.assigned_locations || [];
+                    const locationText = assignedLocations.includes('all') ? 
+                        'All Locations' : 
+                        `${assignedLocations.length || 0} location(s)`;
+                    
+                    const isExpired = user.end_date && new Date(user.end_date) < new Date();
+                    const statusColor = !user.is_active || isExpired ? '#ef4444' : '#10b981';
+                    const statusText = !user.is_active ? 'Inactive' : isExpired ? 'Expired' : 'Active';
+                    
+                    // Format dates
+                    const createdDate = user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown';
+                    const updatedDate = user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'Unknown';
+                    
+                    return `
+                        <div class="category-item" style="${!user.is_active || isExpired ? 'opacity: 0.6;' : ''}">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 18px;">${roleIcons[user.role]}</span>
+                                    <div>
+                                        <strong>${DOMPurify.sanitize(user.name)}</strong>
+                                        <span style="background: ${roleColors[user.role]}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px; text-transform: uppercase;">
+                                            ${user.role}
+                                        </span>
+                                        <span style="background: ${statusColor}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 4px;">
+                                            ${statusText}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div style="font-size: 12px; color: #6b7280; margin-top: 4px; margin-left: 26px;">
+                                    ${DOMPurify.sanitize(user.email)}
+                                    ${user.department ? ` • ${DOMPurify.sanitize(user.department)}` : ''}
+                                    <br>
+                                    <span style="color: #10b981;">📍 ${locationText}</span>
+                                    ${user.end_date ? ` • <span style="color: ${isExpired ? '#ef4444' : '#f59e0b'};">📅 Expires: ${new Date(user.end_date).toLocaleDateString()}</span>` : ''}
+                                    <br>
+                                    <span style="font-size: 11px; color: #9ca3af;">
+                                        Created: ${createdDate}${user.created_by ? ` by ${DOMPurify.sanitize(user.created_by)}` : ''}
+                                        ${updatedDate !== createdDate ? ` • Updated: ${updatedDate}` : ''}
+                                    </span>
+                                    ${user.notes ? `<br><span style="color: #6b7280; font-style: italic;">📝 ${DOMPurify.sanitize(user.notes)}</span>` : ''}
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-warning btn-sm" onclick="App.editUser('${user.id}')" title="Edit User">
+                                    ✏️
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="App.deleteUser('${user.id}')" 
+                                        ${user.email === currentUser ? 'disabled title="Cannot delete current user"' : ''}>
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            // Add user
+            async function addUser() {
+                const name = document.getElementById('userNameInput')?.value.trim();
+                const email = document.getElementById('userEmailInput')?.value.trim();
+                const password = document.getElementById('userPasswordInput')?.value.trim();
+                const role = document.getElementById('userRoleSelect')?.value;
+                const department = document.getElementById('userDepartmentInput')?.value.trim() || null;
+                const startDate = document.getElementById('userStartDate')?.value || new Date().toISOString().split('T')[0];
+                const endDate = document.getElementById('userEndDate')?.value || null;
+                const isActive = document.getElementById('userIsActive')?.checked !== false;
+                const notes = document.getElementById('userNotes')?.value.trim() || null;
+                const editId = document.getElementById('userEditId')?.value;
+                
+                if (!name || !email || !role) {
+                    showToast('Please fill in all required fields', 'warning');
+                    return;
+                }
+                
+                // Check password requirement
+                if (!editId && !password) {
+                    showToast('Password is required for new users', 'warning');
+                    return;
+                }
+                
+                if (password && password.length < 6) {
+                    showToast('Password must be at least 6 characters', 'warning');
+                    return;
+                }
+                
+                // Check if email already exists (only for new users, not edits)
+                if (!editId) {
+                    const { data: existingUser } = await supabase
+                        .from('users')
+                        .select('id')
+                        .eq('email', email)
+                        .single();
+                    
+                    if (existingUser) {
+                        showToast('User with this email already exists', 'warning');
+                        return;
+                    }
+                }
+                
+                // Get selected locations
+                let assignedLocations = [];
+                const allCheckbox = document.getElementById('allLocationsCheckbox');
+                
+                if (allCheckbox?.checked || role === 'admin') {
+                    assignedLocations = ['all'];
+                } else {
+                    const locationCheckboxes = document.querySelectorAll('.location-checkbox:checked');
+                    assignedLocations = Array.from(locationCheckboxes).map(cb => cb.value);
+                    
+                    if (assignedLocations.length === 0) {
+                        showToast('Please assign at least one location', 'warning');
+                        return;
+                    }
+                }
+                
+                try {
+                    showLoading(true);
+                    
+                    if (editId) {
+                        // Update existing user - include password only if provided
+                        const updateData = {
+                            name: name,
+                            email: email,
+                            role: role,
+                            department: department,
+                            assigned_locations: assignedLocations,
+                            start_date: startDate,
+                            end_date: endDate,
+                            is_active: isActive,
+                            notes: notes
+                        };
+                        
+                        // Only update password if a new one is provided
+                        if (password) {
+                            updateData.password = password;
+                        }
+                        
+                        const { error } = await supabase
+                            .from('users')
+                            .update(updateData)
+                            .eq('id', editId);
+                        
+                        if (error) throw error;
+                        showToast(`User "${name}" updated successfully`, 'success');
+                    } else {
+                        // Add new user - include ALL fields including password
+                        const insertData = {
+                            name: name,
+                            email: email,
+                            password: password, // Required for new users
+                            role: role,
+                            department: department,
+                            assigned_locations: assignedLocations,
+                            start_date: startDate,
+                            end_date: endDate,
+                            is_active: isActive,
+                            notes: notes,
+                            created_by: currentUser
+                        };
+                        
+                        const { error } = await supabase
+                            .from('users')
+                            .insert([insertData]);
+                        
+                        if (error) throw error;
+                        showToast(`User "${name}" added successfully`, 'success');
+                    }
+                    
+                    // Reset form
+                    cancelUserEdit();
+                    await loadUsers();
+                    
+                } catch (error) {
+                    console.error('Error saving user:', error);
+                    showToast(error.message || 'Failed to save user', 'error');
+                } finally {
+                    showLoading(false);
+                }
+            }
+            
+            // Edit user
+            function editUser(userId) {
+                const user = users.find(u => u.id === userId);
+                if (!user) return;
+                
+                // Populate ALL form fields from database
+                document.getElementById('userEditId').value = user.id;
+                document.getElementById('userNameInput').value = user.name || '';
+                document.getElementById('userEmailInput').value = user.email || '';
+                // Don't populate password on edit - leave blank for security
+                document.getElementById('userPasswordInput').value = '';
+                document.getElementById('userPasswordInput').placeholder = 'Leave blank to keep current password';
+                document.getElementById('userPasswordInput').removeAttribute('required');
+                document.getElementById('userRoleSelect').value = user.role || 'user';
+                document.getElementById('userDepartmentInput').value = user.department || '';
+                document.getElementById('userStartDate').value = user.start_date || '';
+                document.getElementById('userEndDate').value = user.end_date || '';
+                document.getElementById('userIsActive').checked = user.is_active !== false;
+                document.getElementById('userNotes').value = user.notes || '';
+                
+                // Set locations
+                const assignedLocations = user.assigned_locations || [];
+                const isAllLocations = assignedLocations.includes('all');
+                document.getElementById('allLocationsCheckbox').checked = isAllLocations;
+                
+                // Set individual location checkboxes
+                document.querySelectorAll('.location-checkbox').forEach(cb => {
+                    cb.checked = assignedLocations.includes(cb.value);
+                    cb.disabled = isAllLocations; // Disable if "all" is selected
+                });
+                
+                // Update UI
+                document.getElementById('userFormTitle').textContent = 'Edit User';
+                document.getElementById('userSubmitBtn').textContent = 'Update User';
+                document.getElementById('userCancelBtn').style.display = 'inline-flex';
+                
+                // Scroll to form
+                document.getElementById('userFormTitle').scrollIntoView({ behavior: 'smooth' });
+            }
+            
+            // Cancel user edit
+            function cancelUserEdit() {
+                document.getElementById('userAddForm').reset();
+                document.getElementById('userEditId').value = '';
+                document.getElementById('userFormTitle').textContent = 'Add New User';
+                document.getElementById('userSubmitBtn').textContent = 'Add User';
+                document.getElementById('userCancelBtn').style.display = 'none';
+                document.getElementById('allLocationsCheckbox').checked = false;
+                document.getElementById('userPasswordInput').setAttribute('required', 'required');
+                document.getElementById('userPasswordInput').placeholder = 'Enter password';
+                document.querySelectorAll('.location-checkbox').forEach(cb => {
+                    cb.checked = false;
+                    cb.disabled = false;
+                });
+            }
+            
+            // Delete user
+            async function deleteUser(userId) {
+                const user = users.find(u => u.id === userId);
+                if (!user) return;
+                
+                if (user.email === currentUser) {
+                    showToast('Cannot delete current user', 'warning');
+                    return;
+                }
+                
+                if (!confirm(`Delete user "${user.name}"?\n\nThis action cannot be undone.`)) return;
+                
+                try {
+                    showLoading(true);
+                    
+                    const { error } = await supabase
+                        .from('users')
+                        .delete()
+                        .eq('id', userId);
+                    
+                    if (error) throw error;
+                    
+                    showToast('User deleted', 'success');
+                    await loadUsers();
+                    
+                } catch (error) {
+                    console.error('Error deleting user:', error);
+                    showToast('Failed to delete user', 'error');
+                } finally {
+                    showLoading(false);
+                }
+            }
+            
+            // Refresh users
+            async function refreshUsers() {
+                await loadUsers();
+                showToast('Users list refreshed', 'success');
+            }
+            
+            // Filter users
+            function filterUsers() {
+                const filter = document.getElementById('userFilterSelect')?.value || 'all';
+                const today = new Date().toISOString().split('T')[0];
+                
+                let filteredUsers = [...users];
+                
+                switch(filter) {
+                    case 'active':
+                        filteredUsers = users.filter(u => u.is_active && (!u.end_date || u.end_date >= today));
+                        break;
+                    case 'inactive':
+                        filteredUsers = users.filter(u => !u.is_active);
+                        break;
+                    case 'expired':
+                        filteredUsers = users.filter(u => u.end_date && u.end_date < today);
+                        break;
+                }
+                
+                // Temporarily replace users array and re-display
+                const tempUsers = users;
+                users = filteredUsers;
+                displayUsers();
+                users = tempUsers;
+            }
+            
+            // Toggle all locations
+            function toggleAllLocations() {
+                const allCheckbox = document.getElementById('allLocationsCheckbox');
+                const locationCheckboxes = document.querySelectorAll('.location-checkbox');
+                
+                locationCheckboxes.forEach(cb => {
+                    cb.checked = allCheckbox.checked;
+                    cb.disabled = allCheckbox.checked;
+                });
+            }
+            
+            // Update location checkboxes
+            function updateLocationCheckboxes() {
+                const container = document.getElementById('specificLocations');
+                if (!container) return;
+                
+                const uniqueLocations = [...new Set(assets.map(a => a.location).filter(Boolean))].sort();
+                
+                if (uniqueLocations.length === 0) {
+                    container.innerHTML = '<p style="color: #9ca3af; font-size: 12px;">No locations available. Add assets with locations first.</p>';
+                    return;
+                }
+                
+                container.innerHTML = uniqueLocations.map(loc => `
+                    <label class="location-checkbox-item">
+                        <input type="checkbox" class="location-checkbox" value="${DOMPurify.sanitize(loc)}">
+                        ${DOMPurify.sanitize(loc)}
+                    </label>
+                `).join('');
+            }
+            
+            // Load assets
+            async function loadAssets() {
+                try {
+                    showLoading(true);
+                    
+                    const { data, error } = await supabase
+                        .from('assets')
+                        .select('*')
+                        .order('created_date', { ascending: false });
+                    
+                    if (error) throw error;
+                    
+                    assets = data || [];
+                    
+                    // Immediately apply location filtering after loading
+                    extractFilters();
+                    applyFilters(); // This will filter based on user's assigned locations
+                    
+                } catch (error) {
+                    console.error('Load error:', error);
+                    showToast('Failed to load assets', 'error');
+                } finally {
+                    showLoading(false);
+                }
+            }
+            
+            // Extract filters
+            function extractFilters() {
+                const uniqueLocations = [...new Set(assets.map(a => a.location).filter(Boolean))];
+                locations = uniqueLocations.sort();
+                
+                // Filter locations based on user's assigned locations
+                let availableLocations = locations;
+                if (userRole !== 'admin') {
+                    if (currentUserData?.assignedLocations && currentUserData.assignedLocations.length > 0) {
+                        if (!currentUserData.assignedLocations.includes('all')) {
+                            // Only show locations the user has access to
+                            availableLocations = locations.filter(loc => 
+                                currentUserData.assignedLocations.includes(loc)
+                            );
+                        }
+                    } else {
+                        // No assigned locations - show empty filter
+                        availableLocations = [];
+                    }
+                }
+                
+                const locationFilter = document.getElementById('filterLocation');
+                if (locationFilter) {
+                    if (availableLocations.length > 0) {
+                        locationFilter.innerHTML = '<option value="">All My Locations</option>' +
+                            availableLocations.map(loc => `<option value="${DOMPurify.sanitize(loc)}">${DOMPurify.sanitize(loc)}</option>`).join('');
+                    } else {
+                        locationFilter.innerHTML = '<option value="">No Locations Assigned</option>';
+                        locationFilter.disabled = true;
+                    }
+                }
+                
+                updateLocationCheckboxes();
+                loadCategories();
+            }
+            
+            // Apply filters
+            function applyFilters() {
+                const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
+                const locationFilter = document.getElementById('filterLocation')?.value;
+                const categoryFilter = document.getElementById('filterCategory')?.value;
+                const statusFilter = document.getElementById('filterStatus')?.value;
+                const processedFilter = document.getElementById('filterProcessed')?.value;
+                
+                // CRITICAL: First filter by user's assigned locations (unless admin)
+                let baseAssets = assets;
+                
+                // Apply location-based access control
+                if (userRole !== 'admin') {
+                    // For non-admin users, strictly enforce location restrictions
+                    if (currentUserData?.assignedLocations && currentUserData.assignedLocations.length > 0) {
+                        if (!currentUserData.assignedLocations.includes('all')) {
+                            // User has specific location restrictions
+                            baseAssets = assets.filter(asset => 
+                                asset.location && currentUserData.assignedLocations.includes(asset.location)
+                            );
+                        }
+                        // If assignedLocations includes 'all', no filtering needed
+                    } else {
+                        // User has no assigned locations - show no assets
+                        baseAssets = [];
+                    }
+                }
+                
+                // Then apply other filters on the location-filtered assets
+                filteredAssets = baseAssets.filter(asset => {
+                    if (searchTerm && !asset.asset_id?.toLowerCase().includes(searchTerm) && 
+                        !asset.name?.toLowerCase().includes(searchTerm) &&
+                        !asset.serial_number?.toLowerCase().includes(searchTerm)) return false;
+                    if (locationFilter && asset.location !== locationFilter) return false;
+                    if (categoryFilter && asset.category !== categoryFilter) return false;
+                    if (statusFilter && asset.status !== statusFilter) return false;
+                    if (processedFilter && asset.processed !== (processedFilter === 'true')) return false;
+                    
+                    return true;
+                });
+                
+                currentPage = 1;
+                displayAssets();
+                updateStats();
+            }
+            
+            // Display assets
+            function displayAssets() {
+                const tbody = document.getElementById('assetsTableBody');
+                if (!tbody) return;
+                
+                const recordCount = document.getElementById('recordCount');
+                if (recordCount) {
+                    recordCount.textContent = `${filteredAssets.length} records found`;
+                }
+                
+                if (filteredAssets.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 40px;">No assets found</td></tr>';
+                    document.getElementById('pagination').innerHTML = '';
+                    return;
+                }
+                
+                let displayAssets = filteredAssets;
+                if (itemsPerPage !== 'all') {
+                    const perPage = parseInt(itemsPerPage);
+                    totalPages = Math.ceil(filteredAssets.length / perPage);
+                    const start = (currentPage - 1) * perPage;
+                    const end = start + perPage;
+                    displayAssets = filteredAssets.slice(start, end);
+                } else {
+                    totalPages = 1;
+                    currentPage = 1;
+                }
+                
+                tbody.innerHTML = displayAssets.map(asset => {
+                    const hasMainPhotos = asset.main_photos && asset.main_photos.length > 0;
+                    const hasNameplatePhotos = asset.nameplate_photos && asset.nameplate_photos.length > 0;
+                    const firstPhoto = hasMainPhotos ? asset.main_photos[0].url : 
+                                      hasNameplatePhotos ? asset.nameplate_photos[0].url : null;
+                    
+                    return `
+                        <tr>
+                            <td>
+                                ${firstPhoto ? 
+                                    `<img src="${firstPhoto}" class="photo-thumb" onclick="App.viewPhoto('${firstPhoto}')" alt="Asset">` : 
+                                    '<span style="color: #9ca3af;">📷</span>'}
+                            </td>
+                            <td>
+                                <a href="#" class="asset-id-cell" onclick="App.viewAssetDetails('${asset.id}'); return false;">
+                                    ${DOMPurify.sanitize(asset.asset_id || '-')}
+                                </a>
+                            </td>
+                            <td>${DOMPurify.sanitize(asset.name || '-')}</td>
+                            <td class="hide-mobile">${DOMPurify.sanitize(asset.category || '-')}</td>
+                            <td class="hide-mobile">${DOMPurify.sanitize(asset.manufacturer || '-')}</td>
+                            <td class="hide-mobile">${DOMPurify.sanitize(asset.model || '-')}</td>
+                            <td class="hide-mobile">${DOMPurify.sanitize(asset.serial_number || '-')}</td>
+                            <td class="hide-mobile">${asset.year || '-'}</td>
+                            <td class="hide-mobile">${DOMPurify.sanitize(asset.location || '-')}</td>
+                            <td><span class="status-badge status-${asset.status || 'pending'}">${asset.status || 'pending'}</span></td>
+                            <td class="hide-mobile checkbox-cell">${asset.processed ? '✅' : '⬜'}</td>
+                            <td class="hide-mobile checkbox-cell">${asset.needs_review ? '⚠️' : '✅'}</td>
+                            <td class="hide-mobile">
+                                ${userRole === 'admin' ? 
+                                    `<button class="btn btn-danger btn-sm" onclick="App.deleteAsset('${asset.id}')" style="padding: 4px 8px;">Delete</button>` : 
+                                    `<button class="btn btn-sm" onclick="App.viewAssetDetails('${asset.id}')" style="padding: 4px 8px;">Edit</button>`}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+                
+                updatePagination();
+            }
+            
+            // Update pagination
+            function updatePagination() {
+                const pagination = document.getElementById('pagination');
+                if (!pagination || itemsPerPage === 'all') {
+                    if (pagination) pagination.innerHTML = '';
+                    return;
+                }
+                
+                let html = `
+                    <button class="pagination-btn" onclick="App.goToPage(1)" ${currentPage === 1 ? 'disabled' : ''}>
+                        First
+                    </button>
+                    <button class="pagination-btn" onclick="App.goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+                        Previous
+                    </button>
+                    <span class="pagination-info">
+                        Page ${currentPage} of ${totalPages}
+                    </span>
+                    <button class="pagination-btn" onclick="App.goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+                        Next
+                    </button>
+                    <button class="pagination-btn" onclick="App.goToPage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}>
+                        Last
+                    </button>
+                `;
+                
+                pagination.innerHTML = html;
+            }
+            
+            // Go to page
+            function goToPage(page) {
+                if (page < 1 || page > totalPages) return;
+                currentPage = page;
+                displayAssets();
+                document.querySelector('.table-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            
+            // Change page size
+            function changePageSize() {
+                const select = document.getElementById('itemsPerPage');
+                if (select) {
+                    itemsPerPage = select.value === 'all' ? 'all' : parseInt(select.value);
+                    currentPage = 1;
+                    displayAssets();
+                }
+            }
+            
+            // Update stats
+            function updateStats() {
+                const displayed = filteredAssets.length > 0 ? filteredAssets : assets;
+                document.getElementById('totalAssets').textContent = displayed.length;
+                document.getElementById('processedAssets').textContent = displayed.filter(a => a.processed).length;
+                document.getElementById('reviewAssets').textContent = displayed.filter(a => a.needs_review).length;
+                
+                const withPhotos = displayed.filter(a => 
+                    (a.main_photos && a.main_photos.length > 0) || 
+                    (a.nameplate_photos && a.nameplate_photos.length > 0)
+                ).length;
+                document.getElementById('todayAssets').textContent = withPhotos;
+            }
+            
+            // Open add modal
+            function openAddModal() {
+                currentAsset = null;
+                document.getElementById('modalTitle').textContent = 'Add New Asset';
+                document.getElementById('assetForm').reset();
+                document.getElementById('assetModal').classList.add('active');
+                PhotoManager.init(null);
+            }
+            
+            // View asset details
+            function viewAssetDetails(id) {
+                const asset = assets.find(a => a.id === id);
+                if (!asset) return;
+                
+                currentAsset = asset;
+                document.getElementById('modalTitle').textContent = 'Asset Details';
+                
+                document.getElementById('assetId').value = asset.asset_id || '';
+                document.getElementById('assetName').value = asset.name || '';
+                document.getElementById('assetCategory').value = asset.category || '';
+                document.getElementById('assetManufacturer').value = asset.manufacturer || '';
+                document.getElementById('assetModel').value = asset.model || '';
+                document.getElementById('assetSerial').value = asset.serial_number || '';
+                document.getElementById('assetYear').value = asset.year || '';
+                document.getElementById('assetLocation').value = asset.location || '';
+                document.getElementById('assetStatus').value = asset.status || 'pending';
+                document.getElementById('assetProcessed').checked = asset.processed || false;
+                document.getElementById('assetNeedsReview').checked = asset.needs_review || false;
+                document.getElementById('assetNotes').value = asset.notes || '';
+                
+                PhotoManager.init(asset.id);
+                
+                document.getElementById('assetModal').classList.add('active');
+            }
+            
+            // Save asset
+            async function saveAsset() {
+                const assetData = {
+                    asset_id: DOMPurify.sanitize(document.getElementById('assetId').value),
+                    name: DOMPurify.sanitize(document.getElementById('assetName').value),
+                    category: document.getElementById('assetCategory').value,
+                    manufacturer: DOMPurify.sanitize(document.getElementById('assetManufacturer').value),
+                    model: DOMPurify.sanitize(document.getElementById('assetModel').value),
+                    serial_number: DOMPurify.sanitize(document.getElementById('assetSerial').value),
+                    year: parseInt(document.getElementById('assetYear').value) || null,
+                    location: DOMPurify.sanitize(document.getElementById('assetLocation').value),
+                    status: document.getElementById('assetStatus').value,
+                    processed: document.getElementById('assetProcessed').checked,
+                    needs_review: document.getElementById('assetNeedsReview').checked,
+                    notes: DOMPurify.sanitize(document.getElementById('assetNotes').value)
+                };
+                
+                if (currentAsset) {
+                    assetData.main_photos = PhotoManager.mainPhotos;
+                    assetData.nameplate_photos = PhotoManager.nameplatePhotos;
+                }
+                
+                try {
+                    showLoading(true);
+                    
+                    if (currentAsset) {
+                        const { error } = await supabase
+                            .from('assets')
+                            .update(assetData)
+                            .eq('id', currentAsset.id);
+                        
+                        if (error) throw error;
+                    } else {
+                        const { data, error } = await supabase
+                            .from('assets')
+                            .insert([assetData])
+                            .select()
+                            .single();
+                        
+                        if (error) throw error;
+                        
+                        if (data && (PhotoManager.mainPhotos.length > 0 || PhotoManager.nameplatePhotos.length > 0)) {
+                            PhotoManager.currentAssetId = data.id;
+                            await PhotoManager.updateAssetPhotos();
+                        }
+                    }
+                    
+                    showToast('Asset saved successfully!', 'success');
+                    closeModal();
+                    await loadAssets();
+                    
+                } catch (error) {
+                    console.error('Save error:', error);
+                    showToast('Failed to save asset', 'error');
+                } finally {
+                    showLoading(false);
+                }
+            }
+            
+            // Delete asset
+            async function deleteAsset(id) {
+                if (!confirm('Delete this asset and all its photos?')) return;
+                
+                try {
+                    const { data: asset } = await supabase
+                        .from('assets')
+                        .select('main_photos, nameplate_photos')
+                        .eq('id', id)
+                        .single();
+                    
+                    if (asset) {
+                        const allPhotos = [...(asset.main_photos || []), ...(asset.nameplate_photos || [])];
+                        const fileNames = allPhotos.map(p => p.fileName).filter(Boolean);
+                        
+                        if (fileNames.length > 0) {
+                            await supabase.storage
+                                .from('asset-photos')
+                                .remove(fileNames);
+                        }
+                    }
+                    
+                    await supabase.from('assets').delete().eq('id', id);
+                    
+                    showToast('Asset deleted', 'success');
+                    await loadAssets();
+                } catch (error) {
+                    showToast('Failed to delete', 'error');
+                }
+            }
+            
+            // Close modal
+            function closeModal() {
+                document.getElementById('assetModal').classList.remove('active');
+                currentAsset = null;
+            }
+            
+            // Scanner functions
+            function startScanner() {
+                document.getElementById('scannerModal').classList.add('active');
+                
+                const html5QrcodeScanner = new Html5Qrcode("scanner-container");
+                html5QrcodeScanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    (decodedText) => {
+                        handleScanResult(decodedText);
+                    }
+                ).catch(err => {
+                    showToast('Camera not available', 'error');
+                    stopScanner();
+                });
+                
+                currentScanner = html5QrcodeScanner;
+            }
+            
+            function stopScanner() {
+                if (currentScanner) {
+                    currentScanner.stop();
+                    currentScanner = null;
+                }
+                document.getElementById('scannerModal').classList.remove('active');
+            }
+            
+            function handleScanResult(text) {
+                stopScanner();
+                const asset = assets.find(a => a.asset_id === text);
+                
+                if (asset) {
+                    viewAssetDetails(asset.id);
+                } else {
+                    openAddModal();
+                    document.getElementById('assetId').value = text;
+                }
+            }
+            
+            // Export data
+            function exportData() {
+                const data = filteredAssets.length > 0 ? filteredAssets : assets;
+                
+                if (data.length === 0) {
+                    showToast('No data to export', 'warning');
+                    return;
+                }
+                
+                const headers = ['Asset ID', 'Name', 'Category', 'Manufacturer', 'Model', 'Serial Number', 'Year', 'Location', 'Status', 'Processed', 'Needs Review', 'Notes', 'Main Photos', 'Nameplate Photos'];
+                const csvContent = [
+                    headers.join(','),
+                    ...data.map(a => [
+                        a.asset_id,
+                        a.name,
+                        a.category,
+                        a.manufacturer,
+                        a.model,
+                        a.serial_number,
+                        a.year,
+                        a.location,
+                        a.status,
+                        a.processed,
+                        a.needs_review,
+                        a.notes,
+                        a.main_photos?.length || 0,
+                        a.nameplate_photos?.length || 0
+                    ].map(v => `"${v || ''}"`).join(','))
+                ].join('\n');
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `assets_${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                
+                showToast('Data exported!', 'success');
+            }
+            
+            // Handle file import
+            function handleFileImport(file) {
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const text = e.target.result;
+                    const rows = text.split('\n').map(row => row.split(','));
+                    
+                    if (rows.length > 1) {
+                        showLoading(true);
+                        let imported = 0;
+                        
+                        for (let i = 1; i < rows.length; i++) {
+                            const row = rows[i];
+                            if (row.length >= 5) {
+                                const assetData = {
+                                    asset_id: row[0]?.replace(/"/g, ''),
+                                    name: row[1]?.replace(/"/g, ''),
+                                    category: row[2]?.replace(/"/g, ''),
+                                    location: row[3]?.replace(/"/g, ''),
+                                    status: row[4]?.replace(/"/g, '') || 'pending'
+                                };
+                                
+                                try {
+                                    await supabase.from('assets').insert([assetData]);
+                                    imported++;
+                                } catch (error) {
+                                    console.error('Import error:', error);
+                                }
+                            }
+                        }
+                        
+                        showToast(`Imported ${imported} assets`, 'success');
+                        await loadAssets();
+                        showLoading(false);
+                    }
+                };
+                reader.readAsText(file);
+            }
+            
+            // Initialize charts
+            function initCharts() {
+                const categoryCtx = document.getElementById('categoryChart')?.getContext('2d');
+                if (categoryCtx) {
+                    new Chart(categoryCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                data: [],
+                                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#6b7280']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
+                    });
+                }
+                
+                const statusCtx = document.getElementById('statusChart')?.getContext('2d');
+                if (statusCtx) {
+                    new Chart(statusCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Audited', 'Pending', 'Missing'],
+                            datasets: [{
+                                label: 'Assets',
+                                data: [],
+                                backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            
+            // Update charts
+            function updateCharts() {
+                const categoryChart = Chart.getChart('categoryChart');
+                if (categoryChart) {
+                    const categoryData = {};
+                    assets.forEach(a => {
+                        categoryData[a.category || 'Other'] = (categoryData[a.category || 'Other'] || 0) + 1;
+                    });
+                    
+                    categoryChart.data.labels = Object.keys(categoryData);
+                    categoryChart.data.datasets[0].data = Object.values(categoryData);
+                    categoryChart.update();
+                }
+                
+                const statusChart = Chart.getChart('statusChart');
+                if (statusChart) {
+                    const audited = assets.filter(a => a.status === 'audited').length;
+                    const pending = assets.filter(a => a.status === 'pending').length;
+                    const missing = assets.filter(a => a.status === 'missing').length;
+                    
+                    statusChart.data.datasets[0].data = [audited, pending, missing];
+                    statusChart.update();
+                }
+            }
+            
+            // Utility functions
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+            
+            function showToast(message, type = 'info') {
+                const container = document.getElementById('toastContainer');
+                if (!container) return;
+                
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                
+                const icon = {
+                    success: '✓',
+                    error: '✕',
+                    warning: '⚠',
+                    info: 'ℹ'
+                }[type] || 'ℹ';
+                
+                toast.innerHTML = `<span>${icon}</span><span>${DOMPurify.sanitize(message)}</span>`;
+                container.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.style.animation = 'slideInRight 0.3s reverse';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
+            
+            function showLoading(show) {
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
+                    overlay.classList.toggle('active', show);
+                }
+            }
+            
+            function viewPhoto(url) {
+                window.open(url, '_blank');
+            }
+            
+            // Public API
+            return {
+                init,
+                login: handleLogin,
+                logout,
+                switchView,
+                openAddModal,
+                viewAssetDetails,
+                saveAsset,
+                deleteAsset,
+                closeModal,
+                startScanner,
+                stopScanner,
+                exportData,
+                applyFilters,
+                changePageSize,
+                goToPage,
+                viewPhoto,
+                addCategory,
+                deleteCategory,
+                addUser,
+                editUser,
+                cancelUserEdit,
+                deleteUser,
+                refreshUsers,
+                filterUsers,
+                toggleAllLocations,
+                PhotoManager: PhotoManager
+            };
+        })();
+        
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', App.init);
+        } else {
+            App.init();
+        }
+    </script>
+</body>
+</html>
