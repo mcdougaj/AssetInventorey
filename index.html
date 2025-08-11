@@ -1966,10 +1966,10 @@
                 <!-- Filters -->
                 <div class="filter-section">
                     <div class="filter-grid">
-                        <select class="filter-select" id="filterLocation" aria-label="Filter by location" onchange="App.applyFilters()">
+                        <select class="filter-select" id="filterLocation" aria-label="Filter by location" onchange="applyFilters()">
                             <option value="">All Locations</option>
                         </select>
-                        <select class="filter-select" id="filterCategory" aria-label="Filter by category" onchange="App.applyFilters()">
+                        <select class="filter-select" id="filterCategory" aria-label="Filter by category" onchange="applyFilters()">
                             <option value="">All Categories</option>
                             <option value="Equipment">Equipment</option>
                             <option value="Furniture">Furniture</option>
@@ -1978,13 +1978,13 @@
                             <option value="Tools">Tools</option>
                             <option value="Other">Other</option>
                         </select>
-                        <select class="filter-select" id="filterStatus" aria-label="Filter by status" onchange="App.applyFilters()">
+                        <select class="filter-select" id="filterStatus" aria-label="Filter by status" onchange="applyFilters()">
                             <option value="">All Status</option>
                             <option value="pending">Pending</option>
                             <option value="audited">Audited</option>
                             <option value="missing">Missing</option>
                         </select>
-                        <select class="filter-select" id="filterProcessed" aria-label="Filter by processed state" onchange="App.applyFilters()">
+                        <select class="filter-select" id="filterProcessed" aria-label="Filter by processed state" onchange="applyFilters()">
                             <option value="">All Items</option>
                             <option value="true">Processed</option>
                             <option value="false">Not Processed</option>
@@ -3455,7 +3455,7 @@
                 }
                 
                 // Event listeners are set up once during initialization
-                // setupEventListeners(); // Removed to prevent duplicate listeners
+                setupEventListeners(); // Enable event listeners for search and other functionality
                 
                 // Load categories for dropdown and management
                 loadCategories();
@@ -3468,6 +3468,19 @@
                     // Update charts and KPIs once initialized
                     updateCharts();
                 }
+            }
+            
+            // Debounce function for search input
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
             }
             
             // Setup event listeners (production mode)
@@ -6624,7 +6637,130 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Wait a bit for all content to load, then remove duplicates
             setTimeout(removeDuplicateElements, 100);
+            
+            // Initialize search functionality
+            initializeSearchAndFilters();
         });
+
+        // Initialize search and filter functionality
+        function initializeSearchAndFilters() {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                // Add event listener for real-time search
+                searchInput.addEventListener('input', function(e) {
+                    applyFilters();
+                });
+
+                // Also handle Enter key press
+                searchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applyFilters();
+                    }
+                });
+            }
+        }
+
+        // Apply filters and search (this function was missing and causing filter dropdowns to break)
+        function applyFilters() {
+            const searchInput = document.getElementById('searchInput');
+            const searchTerm = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            
+            const locationFilter = document.getElementById('filterLocation')?.value || '';
+            const categoryFilter = document.getElementById('filterCategory')?.value || '';
+            const statusFilter = document.getElementById('filterStatus')?.value || '';
+            const processedFilter = document.getElementById('filterProcessed')?.value || '';
+
+            const tableBody = document.getElementById('assetsTableBody');
+            if (!tableBody) {
+                console.warn('Assets table body not found');
+                return;
+            }
+
+            const rows = tableBody.querySelectorAll('tr');
+            let visibleCount = 0;
+            let totalCount = 0;
+
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                
+                // Skip loading/empty rows
+                if (cells.length === 0 || cells.length === 1) return;
+                
+                totalCount++;
+                let showRow = true;
+
+                // Apply search filter
+                if (searchTerm !== '') {
+                    const rowText = row.textContent.toLowerCase();
+                    if (!rowText.includes(searchTerm)) {
+                        showRow = false;
+                    }
+                }
+
+                // Apply location filter (Location is typically in column 8 based on table headers)
+                if (showRow && locationFilter !== '') {
+                    const locationCell = cells[8]; // Location column
+                    if (locationCell && !locationCell.textContent.toLowerCase().includes(locationFilter.toLowerCase())) {
+                        showRow = false;
+                    }
+                }
+
+                // Apply category filter (Category is typically in column 3 based on table headers)
+                if (showRow && categoryFilter !== '') {
+                    const categoryCell = cells[3]; // Category column
+                    if (categoryCell && !categoryCell.textContent.toLowerCase().includes(categoryFilter.toLowerCase())) {
+                        showRow = false;
+                    }
+                }
+
+                // Apply status filter (Status is typically in column 9 based on table headers)
+                if (showRow && statusFilter !== '') {
+                    const statusCell = cells[9]; // Status column
+                    if (statusCell && !statusCell.textContent.toLowerCase().includes(statusFilter.toLowerCase())) {
+                        showRow = false;
+                    }
+                }
+
+                // Apply processed filter (Processed is typically in column 10 based on table headers)
+                if (showRow && processedFilter !== '') {
+                    const processedCell = cells[10]; // Processed column
+                    if (processedCell) {
+                        const cellText = processedCell.textContent.toLowerCase();
+                        const isProcessed = cellText.includes('✅') || cellText.includes('yes') || cellText.includes('processed');
+                        
+                        if (processedFilter === 'true' && !isProcessed) {
+                            showRow = false;
+                        } else if (processedFilter === 'false' && isProcessed) {
+                            showRow = false;
+                        }
+                    }
+                }
+
+                // Show/hide row based on all filters
+                if (showRow) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            // Update record count
+            updateRecordCount(visibleCount, totalCount);
+        }
+
+        // Update the record count display
+        function updateRecordCount(visible, total) {
+            const recordCountElement = document.getElementById('recordCount');
+            if (recordCountElement) {
+                if (visible === total) {
+                    recordCountElement.textContent = `Showing ${total} assets`;
+                } else {
+                    recordCountElement.textContent = `Showing ${visible} of ${total} assets`;
+                }
+            }
+        }
     </script>
 
 </body>
